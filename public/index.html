@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Winston — Gerador de conteúdo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --black: #0a0a0a; --white: #f5f3ee;
+    --gray-100: #ebebeb; --gray-200: #d4d4d0;
+    --gray-400: #9a9a95; --gray-600: #5a5a57;
+    --accent: #c8f03c; --accent-dark: #8fb02a;
+    --font-sans: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --radius: 4px; --radius-lg: 8px;
+  }
+  body { font-family: var(--font-sans); background: var(--black); color: var(--white); min-height: 100vh; font-size: 14px; line-height: 1.6; }
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { background: #111; border-right: 1px solid #1e1e1e; padding: 2rem 1.5rem; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2rem; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 32px; height: 32px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 13px; color: var(--black); flex-shrink: 0; }
+  .logo-text { font-size: 13px; font-weight: 500; color: var(--white); }
+  .logo-sub { font-size: 11px; color: var(--gray-400); font-family: var(--font-mono); margin-top: 1px; }
+  .sidebar-section { display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray-600); margin-bottom: 4px; }
+  .mode-list { display: flex; flex-direction: column; gap: 4px; }
+  .mode-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent; transition: all .15s; font-size: 13px; color: var(--gray-400); background: none; width: 100%; text-align: left; }
+  .mode-item:hover { color: var(--white); background: #1a1a1a; }
+  .mode-item.active { color: var(--white); background: #1a1a1a; border-color: #2a2a2a; }
+  .mode-item.active .mode-dot { background: var(--accent); }
+  .mode-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a2a2a; flex-shrink: 0; transition: background .15s; }
+  .output-checks { display: flex; flex-direction: column; gap: 6px; }
+  .check-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: var(--gray-400); padding: 4px 0; transition: color .15s; }
+  .check-item:hover { color: var(--white); }
+  .check-item.active { color: var(--white); }
+  .check-box { width: 14px; height: 14px; border: 1px solid #2a2a2a; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s; }
+  .check-item.active .check-box { background: var(--accent); border-color: var(--accent); }
+  .check-mark { width: 8px; height: 8px; display: none; }
+  .check-item.active .check-mark { display: block; }
+  .gen-btn { width: 100%; padding: 11px; background: var(--accent); color: var(--black); border: none; border-radius: var(--radius); font-family: var(--font-sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: auto; }
+  .gen-btn:hover { background: #d8f55c; }
+  .gen-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* MAIN */
+  .main { padding: 3rem 3rem 4rem; max-width: 720px; }
+  .main-header { margin-bottom: 2.5rem; }
+  .main-title { font-size: 22px; font-weight: 300; letter-spacing: -0.02em; color: var(--white); margin-bottom: 6px; }
+  .main-title span { color: var(--accent); }
+  .main-sub { font-size: 13px; color: var(--gray-400); font-family: var(--font-mono); }
+  .panel { display: none; }
+  .panel.visible { display: block; }
+  .mode-hint { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: var(--gray-400); font-family: var(--font-mono); margin-bottom: 2rem; line-height: 1.6; }
+  .form-grid { display: grid; gap: 1.25rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray-600); }
+  .field input, .field select, .field textarea { background: #111; border: 1px solid #1e1e1e; border-radius: var(--radius); padding: 9px 12px; font-family: var(--font-sans); font-size: 13px; color: var(--white); outline: none; transition: border-color .2s; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #3a3a3a; }
+  .field select option { background: #111; }
+  .field textarea { line-height: 1.6; min-height: 80px; }
+  .tags-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 11px; padding: 4px 10px; border-radius: 99px; cursor: pointer; border: 1px solid #2a2a2a; color: var(--gray-400); background: none; transition: all .15s; font-family: var(--font-mono); }
+  .tag:hover { border-color: #3a3a3a; color: var(--gray-200); }
+  .tag.active { border-color: var(--accent); color: var(--accent); background: rgba(200,240,60,0.06); }
+  .upload-zone { border: 1px dashed #2a2a2a; border-radius: var(--radius-lg); padding: 2rem; text-align: center; cursor: pointer; position: relative; transition: all .2s; }
+  .upload-zone:hover { border-color: #3a3a3a; background: #111; }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { width: 32px; height: 32px; border: 1px solid #2a2a2a; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: var(--gray-600); font-size: 16px; }
+  .upload-title { font-size: 13px; color: var(--gray-200); margin-bottom: 4px; }
+  .upload-hint { font-size: 11px; color: var(--gray-600); font-family: var(--font-mono); }
+  .file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .file-item { display: flex; align-items: center; justify-content: space-between; background: #111; border: 1px solid #1e1e1e; border-radius: var(--radius); padding: 6px 10px; }
+  .file-item span { font-size: 11px; color: var(--gray-200); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 85%; }
+  .file-item button { font-size: 10px; color: var(--gray-600); background: none; border: none; cursor: pointer; }
+  .img-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .img-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius); border: 1px solid #2a2a2a; }
+  .divider { height: 1px; background: #1a1a1a; margin: 2rem 0; }
+
+  /* RESULTS */
+  .result-area { margin-top: 3rem; display: none; }
+  .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .result-title { font-size: 13px; color: var(--gray-400); font-family: var(--font-mono); }
+  .result-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rtab { font-size: 11px; padding: 4px 12px; border-radius: 99px; cursor: pointer; border: 1px solid #2a2a2a; color: var(--gray-600); background: none; font-family: var(--font-mono); transition: all .15s; }
+  .rtab:hover { border-color: #3a3a3a; color: var(--gray-400); }
+  .rtab.active { border-color: var(--accent); color: var(--accent); }
+  .rblock { background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: var(--radius-lg); padding: 1.5rem; display: none; }
+  .rblock.visible { display: block; }
+  .rblock pre { font-family: var(--font-mono); font-size: 12px; line-height: 1.8; color: var(--gray-200); white-space: pre-wrap; word-break: break-word; }
+  .copy-btn { font-size: 10px; padding: 4px 10px; border-radius: 99px; cursor: pointer; border: 1px solid #2a2a2a; color: var(--gray-600); background: none; font-family: var(--font-mono); margin-top: 1rem; display: inline-block; transition: all .15s; }
+  .copy-btn:hover { border-color: #3a3a3a; color: var(--gray-400); }
+  .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
+  .loading { display: none; align-items: center; gap: 10px; margin-top: 1.5rem; padding: 1rem; background: #111; border: 1px solid #1e1e1e; border-radius: var(--radius); }
+  .loading.visible { display: flex; }
+  .dots { display: flex; gap: 4px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: .2s; }
+  .dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes pulse { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+  .loading-msg { font-size: 12px; color: var(--gray-400); font-family: var(--font-mono); }
+  .error { display: none; margin-top: 1rem; padding: 10px 14px; background: rgba(200,40,40,0.08); border: 1px solid rgba(200,40,40,0.2); border-radius: var(--radius); font-size: 12px; color: #e06060; font-family: var(--font-mono); line-height: 1.6; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">W</div>
+      <div>
+        <div class="logo-text">call Winston.</div>
+        <div class="logo-sub">content agent</div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Modo</div>
+      <div class="mode-list">
+        <button class="mode-item active" onclick="setMode('manual')"><span class="mode-dot"></span>Campos manuais</button>
+        <button class="mode-item" onclick="setMode('docs')"><span class="mode-dot"></span>Documentos</button>
+        <button class="mode-item" onclick="setMode('both')"><span class="mode-dot"></span>Campos + documentos</button>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Gerar</div>
+      <div class="output-checks">
+        <div class="check-item active" onclick="toggleOutput(this,'case')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-4" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          Case (PT + EN)
+        </div>
+        <div class="check-item active" onclick="toggleOutput(this,'instagram')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-4" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          Instagram (PT + EN)
+        </div>
+        <div class="check-item active" onclick="toggleOutput(this,'linkedin')">
+          <div class="check-box"><svg class="check-mark" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-4" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          LinkedIn (PT + EN)
+        </div>
+      </div>
+    </div>
+    <button class="gen-btn" id="gen-btn" onclick="generate()">Gerar conteúdo ↗</button>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <h1 class="main-title">Gerador de <span>conteúdo</span></h1>
+      <p class="main-sub">callwinston.me — based in Americana, working worldwide.</p>
+    </div>
+
+    <div id="panel-manual" class="panel visible">
+      <div class="form-grid">
+        <div class="form-row">
+          <div class="field"><label class="field-label">Cliente</label><input type="text" id="client" placeholder="ex: Foolha"/></div>
+          <div class="field"><label class="field-label">Ano</label><input type="text" id="year" placeholder="ex: 2024"/></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Disciplinas</label>
+          <div class="tags-row" id="disc-tags">
+            <span class="tag" data-val="Branding">Branding</span><span class="tag" data-val="Naming">Naming</span><span class="tag" data-val="Packaging">Packaging</span><span class="tag" data-val="Estratégia de marca">Estratégia</span><span class="tag" data-val="Editorial">Editorial</span><span class="tag" data-val="Comunicação">Comunicação</span><span class="tag" data-val="Redesign">Redesign</span><span class="tag" data-val="UX/UI">UX/UI</span><span class="tag" data-val="PDV">PDV</span><span class="tag" data-val="Website">Website</span>
+          </div>
+        </div>
+        <div class="field"><label class="field-label">Setor</label><select id="sector"><option value="">Selecione...</option><option>Food & beverage</option><option>Retail</option><option>Tech</option><option>Agro</option><option>Saúde & beleza</option><option>Jurídico & finanças</option><option>Gastronomia & hospitalidade</option><option>Consumer goods</option><option>Real estate</option><option>Entretenimento</option></select></div>
+        <div class="field"><label class="field-label">Contexto — quem era o cliente antes?</label><textarea id="context" placeholder="ex: Uma soda probiótica sem identidade, num mercado dominado por grandes marcas..."></textarea></div>
+        <div class="field"><label class="field-label">Desafio central</label><textarea id="challenge" placeholder="ex: Competir em prateleira com marcas com orçamento 10x maior..."></textarea></div>
+        <div class="field"><label class="field-label">Decisão principal da Winston</label><textarea id="decision" placeholder="ex: Apostamos em tipografia enorme e cor saturada..."></textarea></div>
+        <div class="field">
+          <label class="field-label">Tom de voz da marca criada</label>
+          <div class="tags-row" id="tone-tags">
+            <span class="tag" data-val="irreverente">Irreverente</span><span class="tag" data-val="sofisticado">Sofisticado</span><span class="tag" data-val="direto">Direto</span><span class="tag" data-val="humano e próximo">Humano</span><span class="tag" data-val="técnico e confiante">Técnico</span><span class="tag" data-val="premium e contido">Premium</span><span class="tag" data-val="ousado e provocador">Ousado</span><span class="tag" data-val="acessível">Acessível</span>
+          </div>
+        </div>
+        <div class="field"><label class="field-label">Resultado concreto (opcional)</label><input type="text" id="result" placeholder="ex: Lançada em 2023, hoje em 4 redes de varejo."/></div>
+        <div class="field"><label class="field-label">Informações adicionais</label><textarea id="extra" rows="5" placeholder="Brief, processo, curiosidades, o que quase não funcionou..."></textarea></div>
+      </div>
+    </div>
+
+    <div id="panel-docs" class="panel">
+      <div class="mode-hint">O agente lê os documentos e extrai automaticamente cliente, desafio, decisão e contexto.</div>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">PDF — briefing, brandbook ou apresentação</label>
+          <div class="upload-zone"><input type="file" id="pdf-input" accept=".pdf" multiple onchange="handlePDFs(this,'main')"/><div class="upload-icon">↑</div><div class="upload-title">Clique ou arraste PDFs aqui</div><div class="upload-hint">Até 3 arquivos</div></div>
+          <div class="file-list" id="pdf-list-main"></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Imagens — mockups, fotos do projeto</label>
+          <div class="upload-zone"><input type="file" id="img-input" accept="image/*" multiple onchange="handleImgs(this,'main')"/><div class="upload-icon">↑</div><div class="upload-title">Clique ou arraste imagens aqui</div><div class="upload-hint">JPG, PNG, WebP — até 8 imagens</div></div>
+          <div class="img-grid" id="img-grid-main"></div>
+        </div>
+        <div class="field"><label class="field-label">Observações adicionais (opcional)</label><textarea id="docs-extra" placeholder="Contexto que não está nos documentos..."></textarea></div>
+      </div>
+    </div>
+
+    <div id="panel-both" class="panel">
+      <div class="mode-hint">Campos principais + documentos como referência complementar.</div>
+      <div class="form-grid">
+        <div class="form-row">
+          <div class="field"><label class="field-label">Cliente</label><input type="text" id="client-b" placeholder="ex: Foolha"/></div>
+          <div class="field"><label class="field-label">Ano</label><input type="text" id="year-b" placeholder="ex: 2024"/></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Disciplinas</label>
+          <div class="tags-row" id="disc-tags-b">
+            <span class="tag" data-val="Branding">Branding</span><span class="tag" data-val="Naming">Naming</span><span class="tag" data-val="Packaging">Packaging</span><span class="tag" data-val="Estratégia de marca">Estratégia</span><span class="tag" data-val="Editorial">Editorial</span><span class="tag" data-val="Comunicação">Comunicação</span><span class="tag" data-val="Redesign">Redesign</span><span class="tag" data-val="UX/UI">UX/UI</span><span class="tag" data-val="PDV">PDV</span><span class="tag" data-val="Website">Website</span>
+          </div>
+        </div>
+        <div class="field"><label class="field-label">Desafio central</label><textarea id="challenge-b" placeholder="O problema real que o projeto precisava resolver..."></textarea></div>
+        <div class="field"><label class="field-label">Decisão principal da Winston</label><textarea id="decision-b" placeholder="A escolha estratégica ou criativa central..."></textarea></div>
+        <div class="field">
+          <label class="field-label">Tom de voz da marca criada</label>
+          <div class="tags-row" id="tone-tags-b">
+            <span class="tag" data-val="irreverente">Irreverente</span><span class="tag" data-val="sofisticado">Sofisticado</span><span class="tag" data-val="direto">Direto</span><span class="tag" data-val="humano e próximo">Humano</span><span class="tag" data-val="técnico e confiante">Técnico</span><span class="tag" data-val="premium e contido">Premium</span><span class="tag" data-val="ousado e provocador">Ousado</span><span class="tag" data-val="acessível">Acessível</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">PDF — briefing, brandbook ou apresentação</label>
+          <div class="upload-zone"><input type="file" id="pdf-input-b" accept=".pdf" multiple onchange="handlePDFs(this,'b')"/><div class="upload-icon">↑</div><div class="upload-title">Clique ou arraste PDFs aqui</div><div class="upload-hint">Até 3 arquivos</div></div>
+          <div class="file-list" id="pdf-list-b"></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Imagens — mockups, fotos do projeto</label>
+          <div class="upload-zone"><input type="file" id="img-input-b" accept="image/*" multiple onchange="handleImgs(this,'b')"/><div class="upload-icon">↑</div><div class="upload-title">Clique ou arraste imagens aqui</div><div class="upload-hint">Até 8 imagens</div></div>
+          <div class="img-grid" id="img-grid-b"></div>
+        </div>
+        <div class="field"><label class="field-label">Informações adicionais</label><textarea id="extra-b" placeholder="Resultado concreto, contexto de mercado, curiosidades..."></textarea></div>
+      </div>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <span class="loading-msg" id="loading-msg">Gerando conteúdo...</span>
+    </div>
+    <div class="error" id="error-box"></div>
+
+    <div class="result-area" id="result-area">
+      <div class="divider"></div>
+      <div class="result-header">
+        <span class="result-title" id="result-label">output</span>
+        <div class="result-tabs" id="result-tabs"></div>
+      </div>
+      <div id="result-blocks"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let currentMode='manual';
+let pdfFiles={main:[],b:[]};
+let imgFiles={main:[],b:[]};
+let results={};
+let selectedOutputs=new Set(['case','instagram','linkedin']);
+
+function setMode(m){
+  currentMode=m;
+  ['manual','docs','both'].forEach(p=>$('panel-'+p).classList.toggle('visible',p===m));
+  document.querySelectorAll('.mode-item').forEach((btn,i)=>btn.classList.toggle('active',['manual','docs','both'][i]===m));
+}
+
+function toggleOutput(el,val){
+  el.classList.toggle('active');
+  selectedOutputs.has(val)?selectedOutputs.delete(val):selectedOutputs.add(val);
+}
+
+document.querySelectorAll('.tag').forEach(t=>t.onclick=()=>t.classList.toggle('active'));
+
+function handlePDFs(input,key){
+  pdfFiles[key]=[...input.files].slice(0,3);
+  const list=$('pdf-list-'+key);
+  list.innerHTML='';
+  pdfFiles[key].forEach((f,i)=>{
+    const item=document.createElement('div');
+    item.className='file-item';
+    item.innerHTML=`<span>${f.name}</span><button onclick="removePDF(${i},'${key}')">remover</button>`;
+    list.appendChild(item);
+  });
+}
+
+function removePDF(i,key){
+  pdfFiles[key].splice(i,1);
+  const list=$('pdf-list-'+key);
+  list.innerHTML='';
+  pdfFiles[key].forEach((f,j)=>{
+    const item=document.createElement('div');
+    item.className='file-item';
+    item.innerHTML=`<span>${f.name}</span><button onclick="removePDF(${j},'${key}')">remover</button>`;
+    list.appendChild(item);
+  });
+}
+
+function handleImgs(input,key){
+  imgFiles[key]=[...input.files].slice(0,8);
+  const grid=$('img-grid-'+key);
+  grid.innerHTML='';
+  imgFiles[key].forEach(f=>{
+    const reader=new FileReader();
+    reader.onload=e=>{const img=document.createElement('img');img.className='img-thumb';img.src=e.target.result;grid.appendChild(img);};
+    reader.readAsDataURL(f);
+  });
+}
+
+function getSelected(id){return[...document.querySelectorAll('#'+id+' .tag.active')].map(e=>e.dataset.val).join(', ');}
+
+async function fileToBase64(file){
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+}
+
+function buildOutputInstructions(){
+  const parts=[];
+  if(selectedOutputs.has('case'))parts.push(`## CASE COMPLETO\nAbertura que começa no meio de algo → contexto → decisão central → detalhe específico → resultado → fecho memorável.\nTom: direto, específico, confiante. 350-600 palavras por versão.\nPT completo primeiro, EN depois. Separe com "---".`);
+  if(selectedOutputs.has('instagram'))parts.push(`## LEGENDA INSTAGRAM\nPT: Nome — 1 linha sobre o cliente. 1-2 linhas sobre a decisão. Disciplinas por ·. callwinston.me/work/[slug]\nEN: mesma estrutura. Separe com "---".`);
+  if(selectedOutputs.has('linkedin'))parts.push(`## LINKEDIN\nPT: Abertura forte. 2-3 parágrafos. Fecha memorável. Máx 3 hashtags.\nEN: mesma estrutura. Separe com "---".`);
+  return parts.join('\n\n');
+}
+
+const VOZ=`Você é o assistente editorial da Call Winston, estúdio de branding de Americana, SP, trabalhando para o mundo.\nVoz Winston: direta, confiante, específica, irreverente quando necessário. Nunca genérica, nunca defensiva.`;
+const PROIBIDO=`PROIBIDO: "em um mercado cada vez mais competitivo", "acreditamos que", "nosso time", "solução criativa", "design thinking", "jornada", "ecossistema", "entre em contato". Sempre específico. Sempre soa como quem fez o trabalho.`;
+
+async function generate(){
+  if(!selectedOutputs.size){showError('Selecione pelo menos um tipo de conteúdo.');return;}
+  $('gen-btn').disabled=true;
+  $('error-box').style.display='none';
+  $('result-area').style.display='none';
+  $('loading').classList.add('visible');
+
+  try{
+    let body;
+    const outputInstr=buildOutputInstructions();
+
+    if(currentMode==='manual'){
+      const client=$('client').value.trim();
+      if(!client)throw new Error('Preencha o nome do cliente.');
+      const data=[
+        'Cliente: '+client,
+        $('year').value.trim()?'Ano: '+$('year').value.trim():'',
+        getSelected('disc-tags')?'Disciplinas: '+getSelected('disc-tags'):'',
+        $('sector').value?'Setor: '+$('sector').value:'',
+        $('context').value.trim()?'Contexto: '+$('context').value.trim():'',
+        $('challenge').value.trim()?'Desafio: '+$('challenge').value.trim():'',
+        $('decision').value.trim()?'Decisão: '+$('decision').value.trim():'',
+        getSelected('tone-tags')?'Tom: '+getSelected('tone-tags'):'',
+        $('result').value.trim()?'Resultado: '+$('result').value.trim():'',
+        $('extra').value.trim()?'Adicional: '+$('extra').value.trim():''
+      ].filter(Boolean).join('\n');
+      body={model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:`${VOZ}\n\nDADOS:\n${data}\n\nGERE:\n${outputInstr}\n\n${PROIBIDO}`}]};
+    }
+
+    else if(currentMode==='docs'){
+      const pdfs=pdfFiles.main,imgs=imgFiles.main;
+      if(!pdfs.length&&!imgs.length)throw new Error('Anexe pelo menos um PDF ou imagem.');
+      $('loading-msg').textContent='Lendo documentos...';
+      const parts=[];
+      for(const f of pdfs){const b=await fileToBase64(f);parts.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b}});}
+      for(const f of imgs){const b=await fileToBase64(f);parts.push({type:'image',source:{type:'base64',media_type:f.type||'image/jpeg',data:b}});}
+      const extra=$('docs-extra').value.trim();
+      parts.push({type:'text',text:`${VOZ}\n\nAnalise os documentos/imagens e extraia: cliente, setor, desafio, decisão criativa, tom de voz, resultados.\n${extra?'Contexto adicional: '+extra:''}\n\nGERE:\n${outputInstr}\n\n${PROIBIDO}`});
+      body={model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:parts}]};
+    }
+
+    else{
+      const client=$('client-b').value.trim();
+      if(!client)throw new Error('Preencha o nome do cliente.');
+      $('loading-msg').textContent='Combinando campos e documentos...';
+      const data=[
+        'Cliente: '+client,
+        $('year-b').value.trim()?'Ano: '+$('year-b').value.trim():'',
+        getSelected('disc-tags-b')?'Disciplinas: '+getSelected('disc-tags-b'):'',
+        $('challenge-b').value.trim()?'Desafio: '+$('challenge-b').value.trim():'',
+        $('decision-b').value.trim()?'Decisão: '+$('decision-b').value.trim():'',
+        getSelected('tone-tags-b')?'Tom: '+getSelected('tone-tags-b'):'',
+        $('extra-b').value.trim()?'Adicional: '+$('extra-b').value.trim():''
+      ].filter(Boolean).join('\n');
+      const parts=[];
+      for(const f of pdfFiles.b){const b=await fileToBase64(f);parts.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b}});}
+      for(const f of imgFiles.b){const b=await fileToBase64(f);parts.push({type:'image',source:{type:'base64',media_type:f.type||'image/jpeg',data:b}});}
+      parts.push({type:'text',text:`${VOZ}\n\nDADOS (prioridade):\n${data}\n\nDOCUMENTOS ACIMA: use como referência complementar.\n\nGERE:\n${outputInstr}\n\n${PROIBIDO}`});
+      body={model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:parts}]};
+    }
+
+    $('loading-msg').textContent='Gerando conteúdo...';
+    const resp=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await resp.json();
+    if(data.error)throw new Error(typeof data.error==='object'?data.error.message:data.error);
+    if(!data.content)throw new Error('Resposta inesperada.');
+    const text=data.content.map(b=>b.text||'').join('\n');
+    results=parseResults(text,[...selectedOutputs]);
+    renderResults();
+  }catch(e){
+    showError(e.message||'Erro ao gerar.');
+  }finally{
+    $('loading').classList.remove('visible');
+    $('loading-msg').textContent='Gerando conteúdo...';
+    $('gen-btn').disabled=false;
+  }
+}
+
+function parseResults(text,outputs){
+  const res={};
+  if(outputs.length===1){res[outputs[0]]=text.trim();return res;}
+  const markers={case:/##\s*CASE COMPLETO/i,instagram:/##\s*LEGENDA INSTAGRAM/i,linkedin:/##\s*LINKEDIN/i};
+  const positions=[];
+  for(const key of outputs){const m=text.search(markers[key]);if(m!==-1)positions.push({key,start:m});}
+  positions.sort((a,b)=>a.start-b.start);
+  for(let i=0;i<positions.length;i++){
+    const start=positions[i].start,end=i+1<positions.length?positions[i+1].start:text.length;
+    res[positions[i].key]=text.slice(start,end).replace(markers[positions[i].key],'').trim();
+  }
+  if(!Object.keys(res).length)res[outputs[0]]=text.trim();
+  return res;
+}
+
+function renderResults(){
+  const labels={case:'Case',instagram:'Instagram',linkedin:'LinkedIn'};
+  const tabs=$('result-tabs'),blocks=$('result-blocks');
+  tabs.innerHTML='';blocks.innerHTML='';
+  for(const key of selectedOutputs){
+    if(!results[key])continue;
+    const tab=document.createElement('button');
+    tab.className='rtab';tab.dataset.tab=key;tab.textContent=labels[key]||key;
+    tab.onclick=()=>showTab(key);tabs.appendChild(tab);
+    const block=document.createElement('div');
+    block.className='rblock';block.dataset.block=key;
+    block.innerHTML=`<pre>${escHtml(results[key])}</pre><button class="copy-btn" onclick="copyResult('${key}',this)">Copiar</button>`;
+    blocks.appendChild(block);
+  }
+  const first=Object.keys(results)[0];
+  if(first)showTab(first);
+  $('result-area').style.display='block';
+  const name=currentMode==='both'?$('client-b').value.trim():currentMode==='manual'?$('client').value.trim():'';
+  $('result-label').textContent=name?name.toLowerCase():'output';
+}
+
+function showTab(key){
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.tab===key));
+  document.querySelectorAll('.rblock').forEach(b=>b.classList.toggle('visible',b.dataset.block===key));
+}
+
+function showError(msg){const b=$('error-box');b.textContent=msg;b.style.display='block';}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function copyResult(key,btn){
+  if(!results[key])return;
+  navigator.clipboard.writeText(results[key]).then(()=>{btn.textContent='Copiado';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Copiar';btn.classList.remove('copied');},2000);});
+}
+</script>
+</body>
+</html>
